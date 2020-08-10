@@ -19,13 +19,15 @@ https://alec-hay.shinyapps.io/flex_dashboard/
 ## What is AQI? How is it calculated?
 - AQI stands for air quality index. Low AQI is good, high AQI is bad.
 - You can calculate an AQI value for each pollutant, as was done in this data set.
-- The formula is 
-<br>
+The formula is: 
+<br/>
 <img src="https://github.com/alechay/aqi_dashboard/blob/master/readme_images/Calculate_AQI.png" width=50% height=50% />
-- To calculate:
-<br>
+To calculate:
+<br/>
 <img src="https://github.com/alechay/aqi_dashboard/blob/master/readme_images/AQI_Table.png" width=50% height=50% />
-- If you wanted to determine the overall AQI, you would look at the pollutant with the highest index.  For example, if NO2 is 125, O3 is 50, SO2 is 30, and CO is 50, and all other pollutants are less than 125, then the AQI is 125–determined ONLY by the concentration of NO2.
+Source: Wikipedia
+<br/>
+If you wanted to determine the overall AQI, you would look at the pollutant with the highest index.  For example, if NO2 is 125, O3 is 50, SO2 is 30, and CO is 50, and all other pollutants are less than 125, then the AQI is 125–determined ONLY by the concentration of NO2.
 
 ## Preprocessing
 1. I was only interested in information about the air quality index (AQI) for each pollutant, so I selected 6 columns: State, Date, NO2 AQI, O3 AQI, SO2 AQI, and CO AQI
