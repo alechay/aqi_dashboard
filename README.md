@@ -19,7 +19,7 @@ https://alec-hay.shinyapps.io/flex_dashboard/
 ## What is AQI? How is it calculated?
 - AQI stands for air quality index. Low AQI is good, high AQI is bad.
 - You can calculate an AQI value for each pollutant, as was done in this data set.
-The formula is: 
+- The formula is: 
 <br/>
 <img src="https://github.com/alechay/aqi_dashboard/blob/master/readme_images/Calculate_AQI.png" width=50% height=50% />
 To calculate:
