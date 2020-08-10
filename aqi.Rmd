@@ -1,0 +1,280 @@
+---
+title: "Air Quality Index (AQI)"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    social: menu
+    source_code: embed
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+# load data in 'global' chunk so it can be shared by all users of the dashboard
+library(shiny)
+library(tidyverse)
+library(tibbletime)
+library(lubridate)
+library(zoo)
+library(sf)
+library(tmap)
+
+###############################################################################
+
+# LOAD AND PROCESS DATA
+
+# get mean NO2, O3, SO2, and CO AQI per month for each state
+aqi_monthly <- read_csv('pollution.csv') %>% 
+  select(everything()) %>%
+  mutate(Date = as.yearmon(paste(year, month), "%Y %m"))
+
+# get mean NO2, O3, SO2, and CO AQI overtime for each state
+aqi_avg <- aqi_monthly %>% 
+  group_by(State) %>% 
+  summarize(NO2.AQI = mean(NO2.AQI), O3.AQI = mean(O3.AQI),
+            SO2.AQI = mean(SO2.AQI), CO.AQI = mean(CO.AQI),
+            .groups='keep') %>% 
+  gather('NO2.AQI', 'O3.AQI', 'SO2.AQI', 'CO.AQI', 
+         key='type', value='AQI') %>% 
+  mutate(type = str_remove(type, '\\.AQI$'))
+
+# use gather to get tidy monthly data for the types of AQI
+tidy <- aqi_monthly %>% 
+  gather('NO2.AQI', 'O3.AQI', 'SO2.AQI', 'CO.AQI', 
+         key='type', value='AQI') %>% 
+  mutate(type = str_remove(type, '\\.AQI$'))
+
+# to plot bar graphs of state AQI for each type and each month
+plot_data <- tidy %>% 
+  group_by(State, month, type) %>% 
+  summarize(AQI = mean(AQI), .groups='keep')
+
+# function monthStart forces the date to the first date of that month and year
+monthStart <- function(x) {
+  x <- as.POSIXlt(x)
+  x$mday <- 1
+  as.Date(x)
+}
+
+# specify group colors for plot
+group.colors <- c(NO2 = "#7CAE00", O3 = "#00BFC4", SO2 ="#C77CFF", CO = "#F8766D")
+
+# months
+month.list <- c('January','February','March','April','May','June',
+                'July','August','September','October','November','December')
+month.number <- c(1:12)
+names(month.number) <- month.list
+```
+
+Line Plot
+=======================================================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+selectInput('x', 'State', unique(aqi_avg$State), selected='California')
+selectInput('AQI_type', 'Pollutant', unique(tidy$type))
+checkboxInput('facet', 'Facet by Pollutant?', FALSE)
+```
+
+Line plot showing AQI over time. Each point is the average AQI in a particular month. You can select the state, type of pollutant, and date range for which you want to see the data. You can also facet the plot to show AQI readings for all 4 pollutants.
+
+Data from https://www.kaggle.com/sogun3/uspollution but was originally scraped from the database of U.S. EPA.
+
+Column
+-----------------------------------------------------------------------
+
+```{r}
+# Get date range output in mm/yyyy format
+
+# observe if facet box is checked and update accordingly
+observeEvent(input$facet, {
+  facet <- input$facet
+  if (facet==FALSE)
+    choices <- unique(tidy$type)
+  else
+    choices <- character(0)
+  updateSelectInput(session, 'AQI_type',
+                    choices = choices,
+                    selected = choices[1])
+})
+
+# # observe state that is selected and update min and max of slider input
+# observeEvent(input$x, {
+#   val <- input$x # this is the State, for example 'Maryland'
+#   min <- as.Date(min(filter(tidy, State==val)$Date), frac=0) # gets first date for that state
+#   max <- as.Date(max(filter(tidy, State==val)$Date), frac=0) # gets last date for that state
+#   updateSliderInput(session, "DatesMerge",
+#                     value = c(min, max),
+#                     min = min, max = max,
+#                     timeFormat="%b %Y")
+# })
+
+column(12, align='center',
+  renderPlot({
+    DatesMerge <- input$DatesMerge
+    month_range <- c(as.character(format(DatesMerge[1],format = "%m/%Y")),
+                     as.character(format(DatesMerge[2],format = "%m/%Y")))
+    if (input$facet==FALSE)
+      p <- ggplot(filter(tidy, State==input$x &
+                           type==input$AQI_type & # filter type
+                           Date >= as.yearmon(DatesMerge[1]) & 
+                           Date <= as.yearmon(DatesMerge[2]))) +
+        theme_bw() +
+        geom_line(aes(x=Date, y=AQI)) +
+        aes(color = as.factor(type)) +
+        scale_color_manual(values=group.colors) +
+        theme(legend.position="none",
+              text = element_text(size=15),
+              # axis.text.x = element_text(angle = 45, hjust=1),
+              axis.title.x=element_blank()) +
+        scale_x_yearmon(format='%b %Y') +
+        labs(title=paste(input$x, 
+                         input$AQI_type, 
+                         paste('(', 
+                               paste(as.character(month_range), collapse = " to "), 
+                               ')', 
+                               sep=''
+                         )
+        )
+        )
+    else
+        p <- ggplot(filter(tidy, State==input$x & # do not filter type
+                         Date >= as.yearmon(DatesMerge[1]) & 
+                         Date <= as.yearmon(DatesMerge[2]))) +
+      theme_bw() +
+      geom_line(aes(x=Date, y=AQI)) +
+      facet_wrap(~type) + # facet at this step
+      aes(color = as.factor(type)) +
+      scale_color_manual(values=group.colors) +
+      theme(legend.position="none", 
+            text = element_text(size=15), 
+            # axis.text.x = element_text(angle = 45, hjust=1),
+            axis.title.x=element_blank()) +
+      scale_x_yearmon(format='%b %Y') +
+      labs(title=paste(input$x, 
+                       paste('(', 
+                             paste(as.character(month_range), collapse = " to "),
+                             ')', 
+                             sep=''
+                       )
+      )
+      )
+  # finally, print out the graph
+  print(p)
+  }, height=500)
+)
+```
+
+```{r}
+column(12, align='center',
+      sliderInput("DatesMerge", "",
+                  min = as.Date("2000-01-01","%Y-%m-%d"), 
+                  max = as.Date("2016-12-31","%Y-%m-%d"), 
+                  value = c(as.Date("2000-01-01","%Y-%m-%d"), 
+                            as.Date("2016-12-31","%Y-%m-%d")),
+                  timeFormat="%b %Y",
+                  width ='100%')
+)
+```
+
+Bar Plot
+=======================================================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+checkboxInput('all', 'All time averages between 2000-2016', FALSE)
+selectInput('month', 'Month', month.list)
+selectInput('type', 'Pollutant', unique(tidy$type))
+```
+
+Bar plot comparing state AQI's in a particular month against each other. When a given month is selected, the AQI in that month from each year between 2000-2016 is averaged together. For example, if January is selected, it takes the January AQI in each year for which there is data and averages it together. This was done for each state. If you click "all months" it takes the average AQI over all months (January-December) between 2000-2016. This way, you can compare all time state AQI averages against each other.
+
+Column
+-----------------------------------------------------------------------
+
+```{r}
+# observe if facet box is checked and update accordingly
+observeEvent(input$all, {
+  all <- input$all
+  if (all==TRUE)
+    choices <- character(0)
+  else
+    choices <- month.list
+  updateSelectInput(session, 'month',
+                    choices = choices,
+                    selected = choices[1])
+})
+
+column(12, align='center',
+  renderPlot({
+    
+    if (input$all == TRUE)
+      g <- ggplot(filter(aqi_avg,
+                         type==input$type)) +
+        theme_bw() +
+        geom_col(aes(x=reorder(State, AQI),
+                     y=AQI,
+                     fill=as.factor(type))) +
+        labs(title=paste('All Time (2000-2016) Average', input$type, 'AQI'),
+             x= 'State',
+             y='AQI') +
+        scale_fill_manual(values=group.colors) +
+        theme(legend.position="none",
+              # axis.text.x = element_text(angle = 45, hjust=1),
+              text = element_text(size=15),
+              axis.title.y=element_blank()) +
+        coord_flip()
+    else
+      g <- ggplot(filter(plot_data, 
+                         month==month.number[input$month], 
+                         type==input$type)) +
+        theme_bw()+
+        geom_col(aes(x = reorder(State, AQI), 
+                     y=AQI,
+                     fill = as.factor(type))) +
+        labs(title=paste(input$month, '(2000-2016)', 'Average', input$type, 'AQI'),
+             x= 'State',
+             y='AQI') +
+        scale_fill_manual(values=group.colors) +
+        theme(legend.position="none",
+              # axis.text.x = element_text(angle = 45, hjust=1),
+              text = element_text(size=15),
+              axis.title.y=element_blank()) +
+        coord_flip()
+    
+    print(g)
+    
+  }, height=600)
+)
+```
+
+Map
+=======================================================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+selectInput('map_type', 'Pollutant', unique(tidy$type))
+```
+
+Animated maps showing state AQI over time. Compare state AQI's against each other and watch how the state AQI's changed over time.
+
+Column
+-----------------------------------------------------------------------
+
+```{r}
+column(12, align='center',
+  renderImage({
+    # When input$n is 1, filename is ./www/NO2.gif
+    filename <- paste(input$map_type, '.gif', sep='')
+    
+    # Return a list containing the filename
+    list(src = filename, height=500)
+  }, deleteFile = FALSE)
+)
+```
+

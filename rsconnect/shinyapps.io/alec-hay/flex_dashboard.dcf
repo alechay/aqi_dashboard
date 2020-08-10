@@ -1,0 +1,10 @@
+name: flex_dashboard
+title:
+username:
+account: alec-hay
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2631035
+bundleId: 3459887
+url: https://alec-hay.shinyapps.io/flex_dashboard/
+when: 1596212355.33852
