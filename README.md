@@ -1,7 +1,7 @@
 # AQI Dashboard
 Made an R Shiny dashboard to visualize trends in air quality index (AQI) from 2000-2016
 
-https://alec-hay.shinyapps.io/aqi_dashboard/
+https://alec-hay.shinyapps.io/flex_dashboard/
 
 ## Data Source
 - https://www.kaggle.com/sogun3/uspollution
